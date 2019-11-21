@@ -54,31 +54,57 @@ def LS1(nodes, time, seed):
 	-    trace: list of best found solution at that point in time. Record every time a new improved solution is found.
 	'''
 
-	# Dummy values
-	quality = 0
-	tour = [1, 2, 3]
-	trace = [[3.45, 102], [7.94, 95]]
+	# STILL NEED TO OPTIMIZE - USE TIME LIMIT?
 
-	coolingRate = 0.005
-	temperature = 1000
+	start = timer()
+	trace = []
+	coolingRate = 0.0001
+	temperature = 10000
 
-	# Calculate probability based on temperature
-
-	# Update temperature based on rate of cooling
-
-	# Use the seed to get a random tour
-	print("nodes: ", nodes)
+	# Use the seed to get a random initial tour
+	print("nodes: ", len(nodes))
 	np.random.seed(seed)
-	randTour = np.random.permutation(np.arange(len(nodes)))
-	print("randTour: ", randTour)
+	currentTour = np.random.permutation(np.arange(len(nodes)))		# contains INDEX of nodes
+	print("currentTour: ", currentTour)
 
 	# Evaluate distance of this random initial tour
-	quality = evaluation_function(randTour)
-	print("quality: ", quality)
+	currentQuality = evaluation_function(currentTour, nodes)
+	print("currentQuality: ", currentQuality)
 
-	# 
+	# Consider a different stopping condition - iteration not based on temp, bounded by time
+	while (temperature > 0.99):
+		# Stop if time has exceeded limit
+		end = timer()
 
-	return quality, tour, trace
+		# Create new tour. Do you just randomly get four points? Is that considered adjacent?
+		randPoints = np.random.choice(np.arange(len(currentTour)), size=4, replace=False)
+		newTour = currentTour.copy()
+		save2 = newTour[randPoints[1]]
+		newTour[randPoints[1]] = newTour[randPoints[0]]
+		newTour[randPoints[0]] = save2
+		save4 = newTour[randPoints[3]]
+		newTour[randPoints[3]] = newTour[randPoints[2]]
+		newTour[randPoints[2]] = save4
+		newQuality = evaluation_function(newTour, nodes)
+
+		# Calculate probability based on temperature
+		probability = np.exp(-(newQuality - currentQuality) / temperature)		# FIX OVERFLOW WARNING
+		randNum = np.random.random()
+
+		# Update temperature based on rate of cooling
+		temperature = temperature * (1 - coolingRate)
+
+		# Decide whether to stay or proceed with new tour
+		if (newQuality < currentQuality) or (probability >= randNum):
+			currentTour = newTour
+			currentQuality = newQuality
+			end = timer()
+			trace.append([end, currentQuality])
+
+	print("finalTour: ", currentTour)
+	print("finalQuality: ", currentQuality)
+
+	return currentQuality, currentTour, trace
 
 def LS2(nodes, time, seed):
 	'''
@@ -101,12 +127,12 @@ def LS2(nodes, time, seed):
 	trace = [[3.45, 102], [7.94, 95]]
 	return quality, tour, trace
 
-def evaluation_function(tour):
+def evaluation_function(tour, nodes):
 	'''
 	Calculates the total distance of a tour.
 
 	Args:
-	-    tour: N x 3 array of nodes
+	-    tour: N array of node INDICES
 
 	Returns:
 	-    distance: an int representing the length of the tour
@@ -123,7 +149,6 @@ def evaluation_function(tour):
 			nextCity = nodes[tour[0]]
 		else:
 			nextCity = nodes[tour[i+1]]
-		# print("currentCity: ", currentCity[1])
 		dist += distance(currentCity[1], currentCity[2], nextCity[1], nextCity[2])
 	return dist
 
@@ -157,7 +182,8 @@ if __name__ == '__main__':
 
 	for line in lines:
 		splitStr = line.split()
-		if splitStr[0].isdigit():
+		# print(len(splitStr))
+		if len(splitStr) != 0 and splitStr[0].isdigit():
 			node = [float(splitStr[0]), float(splitStr[1]), float(splitStr[2])]
 			nodes.append(node)				# Can speed up by pre-allocating & indexing instead of append
 	f.close()
