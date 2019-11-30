@@ -55,10 +55,13 @@ def LS1(nodes, time, seed):
 	'''
 
 	# STILL NEED TO OPTIMIZE - USE TIME LIMIT?
+	# Better stopping criterion - no improved solution for a certain number of iterations
+	# Restarts?
+	# ADD TABU???
 
 	start = timer()
 	trace = []
-	coolingRate = 0.0001
+	coolingRate = 0.0005
 	temperature = 10000
 
 	# Use the seed to get a random initial tour
@@ -71,12 +74,21 @@ def LS1(nodes, time, seed):
 	currentQuality = evaluation_function(currentTour, nodes)
 	print("currentQuality: ", currentQuality)
 
+	# Keep track of best solution
+	bestTour = currentTour
+	bestQuality = currentQuality
+
+	# np.random.seed()	# Reset seed, otherwise you'll get exact same final answer every time. Or that what we want???
+
 	# Consider a different stopping condition - iteration not based on temp, bounded by time
 	while (temperature > 0.99):
 		# Stop if time has exceeded limit
 		end = timer()
+		if end >= time:
+			print("TIME LIMIT")
+			break
 
-		# Create new tour. Do you just randomly get four points? Is that considered adjacent?
+		# Create new tour. 2-opt exchange. Do you just randomly get four points? Is that considered adjacent?
 		randPoints = np.random.choice(np.arange(len(currentTour)), size=4, replace=False)
 		newTour = currentTour.copy()
 		save2 = newTour[randPoints[1]]
@@ -101,10 +113,15 @@ def LS1(nodes, time, seed):
 			end = timer()
 			trace.append([end, currentQuality])
 
-	print("finalTour: ", currentTour)
-	print("finalQuality: ", currentQuality)
+		# Update best solution
+		if currentQuality < bestQuality:
+			bestTour = currentTour
+			bestQuality = currentQuality
 
-	return currentQuality, currentTour, trace
+	print("finalTour: ", bestTour)
+	print("finalQuality: ", bestQuality)
+
+	return bestQuality, bestTour, trace
 
 def LS2(nodes, time, seed):
 	'''
@@ -121,11 +138,133 @@ def LS2(nodes, time, seed):
 	-    trace: list of best found solution at that point in time. Record every time a new improved solution is found.
 	'''
 
-	# Dummy values
-	quality = 0
-	tour = [1, 2, 3]
-	trace = [[3.45, 102], [7.94, 95]]
-	return quality, tour, trace
+	start = timer()
+	trace = []
+	np.random.seed(seed)
+
+	# Parameters
+	populationSize = 100					# How many different routes at one time, always maintain this size
+	mutationRate = 0.1						# How often to mutate
+	numElites = 10							# Get the top k from each generation and directly let them into the next generation
+	numGenerations = 200					# Basically the number of iterations
+
+	# Generate a certain number of initial random tours
+	# Population contains INDICES of nodes
+	population = []
+	for i in range(populationSize):
+		tour = np.random.permutation(np.arange(len(nodes)))
+		population.append(tour)
+	print("population: ", len(population))
+
+	bestQuality = evaluation_function(population[i], nodes)
+	bestTour = population[0]
+
+	print("firstQuality: ", bestQuality)
+	print("firstTour: ", bestTour)
+
+	# START LOOP
+	for i in range(numGenerations):
+		# Stop if time has exceeded limit
+		end = timer()
+		if end >= time:
+			print("TIME LIMIT")
+			break
+
+		# Calculate a parallel array containing quality of each tour in population
+		distances = []
+		fitness = []			# Inverse of distance
+		for tour in population:
+			quality = evaluation_function(tour, nodes)
+			distances.append(quality)
+			fitness.append(1/quality)
+
+		# Sort tours from shortest to longest
+		sortInd = np.argsort(distances)		# Ascending order, shortest to longest
+
+		newPopulation = []
+		parents = []
+
+		# Select mating pool
+		# Elitism - Top k tours make it into new population automatically
+		for k in range(numElites):
+			newPopulation.append(population[sortInd[k]])
+			parents.append(population[sortInd[k]])
+
+		# Option 1 - Fitness Proportion Selection
+		fitnessNorm = fitness / np.sum(fitness)
+		samples = np.random.choice(len(population), size=populationSize - numElites, p=fitnessNorm)		# replace = ?
+		for i in range(len(samples)):
+			parents.append(population[samples[i]])
+
+		# Option 2 - Tournament Selection
+
+		# Breed - Crossover
+		for i in range(populationSize - numElites):
+			child = crossover(parents[i], parents[len(parents)-i-1])
+			newPopulation.append(child)
+
+		# Mutate
+		mutatedPopulation = []
+		randNum = np.random.random()
+		for tour in newPopulation:
+			if randNum < mutationRate:
+				mutatedPopulation.append(mutate(tour))
+			else:
+				mutatedPopulation.append(tour)
+
+		population = mutatedPopulation
+
+		# Find best tour of this generation
+		distances = []
+		for tour in population:
+			quality = evaluation_function(tour, nodes)
+			distances.append(quality)
+		minInd = np.argmin(distances)
+		minQuality = distances[minInd]
+		minTour = population[minInd]
+
+		if minQuality < bestQuality:
+			bestQuality = minQuality
+			bestTour = minTour
+			end = timer()
+			trace.append([end, bestQuality])
+
+	# END LOOP
+
+	print("bestQuality: ", bestQuality)
+	print("bestTour: ", bestTour)
+
+	return bestQuality, bestTour, trace
+
+def crossover(parent1, parent2):
+	'''
+	Breed two tours by taking a random slice of one parent and
+	joining it with the remaining genes of the second parent.
+	'''
+	child1 = []
+	child2 = []
+	gene1 = np.random.choice(np.arange(len(parent1)))
+	gene2 = np.random.choice(np.arange(len(parent1)))
+	startGene = min(gene1, gene2)
+	endGene = max(gene1, gene2)
+
+	for i in range(startGene, endGene):
+		child1.append(parent1[i])
+
+	child2 = [gene for gene in parent2 if gene not in child1]
+
+	return child1 + child2
+
+def mutate(tour):
+	'''
+	Randomly swap two nodes in the tour
+	'''
+	mutatedTour = tour.copy()
+	randIndices = np.random.choice(np.arange(len(mutatedTour)), size=2)
+	save = mutatedTour[randIndices[1]]
+	mutatedTour[randIndices[1]] = mutatedTour[randIndices[0]]
+	mutatedTour[randIndices[0]] = save
+	return mutatedTour
 
 def evaluation_function(tour, nodes):
 	'''
@@ -161,10 +300,10 @@ def distance(x1, y1, x2, y2):
 	-    x2, y2: Coordinates of next city
 
 	Returns:
-	-    distance: Distance between the two cities
+	-    distance: Distance between the two cities, rounded to the nearest integer
 	'''
 
-	return math.sqrt((x2-x1)**2 + (y2-y1)**2)
+	return round(math.sqrt((x2-x1)**2 + (y2-y1)**2))
 
 if __name__ == '__main__':
 
@@ -196,6 +335,7 @@ if __name__ == '__main__':
 		seed = int(args[4])
 
 	# Provide invalid input checking??? e.g. alg = approx w/o seed, BnB with seed, etc
+	# Can we assume valid input always?
 
 	# Call different method based on 'alg' parameter
 	if alg == "BnB":
