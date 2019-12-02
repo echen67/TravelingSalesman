@@ -44,9 +44,9 @@ def Approx(nodes, time, seed):
 	-   seed: random seed
 
 	Returns:
-	-    quality: quality of select solution found
+	-    quality: quality of best solution found
 	-    tour: list of node IDs
-	-    trace: list of select found solution at that point in time
+	-    trace: list of best found solution at that point in time. Record every time a new improved solution is found.
 	'''
 
 	# change index numbers to start from 0
