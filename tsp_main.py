@@ -17,7 +17,7 @@ visited = []
 distanceList = []
 
 # Branch and Bound algorithm
-def BnB(nodes, time, seed):
+def BnB(nodes, time):
     '''
     Args:
     -    nodes: N x 3 array of nodes
@@ -36,7 +36,7 @@ def BnB(nodes, time, seed):
 
     start = timer()
     # BnBbestTour = [None] * len(nodes)
-    BnBbestQuality, BnBbestTour, BnBtrace = Approx(nodes, time, seed)
+    BnBbestQuality, BnBbestTour, BnBtrace = Approx(nodes, time, 0)
     visited = [False] * len(nodes)
     tempPath = [-1] * len(nodes)
 
@@ -231,7 +231,7 @@ def Approx(nodes, time=600, seed=0):
 		tour = tour[:-1]
 
 		if seed is not None:
-			trace.append([round(timer(), 2), rand_quality - quality])
+			trace.append(["%.2f" % round(timer(), 2), rand_quality - quality])
 
 	quality += distances_dict[tour[0]][tour[-1]]
 	trace.append([round(timer(), 2), quality])
@@ -308,7 +308,7 @@ def LS1(nodes, time=600, seed=0):
 			currentTour = newTour
 			currentQuality = newQuality
 			end = timer()
-			trace.append([round(end, 2), currentQuality])
+			trace.append(["%.2f" % round(end, 2), currentQuality])
 
 		# Update best solution
 		if currentQuality < bestQuality:
@@ -390,9 +390,8 @@ def LS2(nodes, time=600, seed=0):
 	for i in range(populationSize):
 		tour = np.random.permutation(np.arange(len(nodes)))
 		population.append(tour)
-	# print("population: ", len(population))
 
-	bestQuality = evaluation_function(population[i], nodes)
+	bestQuality = evaluation_function(population[0], nodes)
 	bestTour = population[0]
 
 	print("firstQuality: ", bestQuality)
@@ -444,8 +443,9 @@ def LS2(nodes, time=600, seed=0):
 
 		# Mutate
 		mutatedPopulation = []
-		randNum = np.random.random()
+		# randNum = np.random.random()
 		for tour in newPopulation:
+			randNum = np.random.random()
 			if randNum < mutationRate:
 				mutatedPopulation.append(mutate(tour))
 			else:
@@ -462,12 +462,22 @@ def LS2(nodes, time=600, seed=0):
 		minQuality = distances[minInd]
 		minTour = population[minInd]
 
+		# faster
+		# minTour = None
+		# minQuality = float('inf')
+		# for tour in population:
+		# 	d = evaluation_function(tour, nodes)
+		# 	if d < minQuality:
+		# 		minQuality = d
+		# 		minTour = tour
+
 		# Update best solution
 		if minQuality < bestQuality:
 			bestQuality = minQuality
 			bestTour = minTour
 			end = timer()
-			trace.append([round(end, 2), bestQuality])
+			# trace.append([round(end, 2), bestQuality])
+			trace.append(["%.2f" % round(end, 2), bestQuality])
 			lastTime = timer()
 
 		# Stopping criterion: No improvement for ?? seconds
@@ -572,8 +582,9 @@ if __name__ == '__main__':
 	time = parsed_args.time
 	seed = parsed_args.seed
 
-	time = float(time)
-	seed = int(seed)
+	time = int(time)
+	if seed is not None:
+		seed = int(seed)
 
 	# Open file and read in nodes
 	nodes = []
@@ -604,7 +615,7 @@ if __name__ == '__main__':
 	# Output Files
 	# Solution file
 	outputName = filename[:-4] + "_" + alg + "_" + str(time)
-	if seed != None:
+	if seed != None and alg != "BnB":
 		outputName = outputName + "_" + str(seed)
 	outputName = outputName + ".sol"
 
@@ -618,7 +629,7 @@ if __name__ == '__main__':
 
 	# Trace file
 	traceName = filename[:-4] + "_" + alg + "_" + str(time)
-	if seed != None:
+	if seed != None and alg != "BnB":
 		traceName = traceName + "_" + str(seed)
 	traceName = traceName + ".trace"
 
@@ -626,5 +637,6 @@ if __name__ == '__main__':
 	for item in trace:
 		temp = str(item)[1:-1] + "\n"
 		temp = temp.replace(" ", "")
+		temp = temp.replace("'", "")
 		f.write(temp)
 	f.close()
