@@ -3,6 +3,9 @@ import argparse
 from timeit import default_timer as timer
 import numpy as np
 import math
+from operator import itemgetter
+from random import randrange
+from collections import defaultdict
 
 def BnB(nodes, time):
 	'''
@@ -21,23 +24,108 @@ def BnB(nodes, time):
 	trace = [[3.45, 102], [7.94, 95]]
 	return quality, tour, trace
 
+
+def get_neighbor(distances, tour, node):
+	neighbors = distances[node]
+	current_dist = [(i, j) for i, j in neighbors.items()
+					if i not in tour]
+
+	neighbor_info = sorted(current_dist, key=itemgetter(1))
+
+	return neighbor_info[0][0], neighbor_info[0][1]
+
+
 def Approx(nodes, time, seed):
 	'''
+	Closest Insertion
 	Args:
-	-    nodes: N x 3 array of nodes
-	-    time: cut-off time in seconds
-	-    seed: random seed
+	-   nodes: N x 3 array of nodes
+	-   time: cut-off time in seconds
+	-   seed: random seed
 
 	Returns:
 	-    quality: quality of best solution found
 	-    tour: list of node IDs
 	-    trace: list of best found solution at that point in time. Record every time a new improved solution is found.
 	'''
-	# Dummy values
-	quality = 0
-	tour = [1, 2, 3]
-	trace = [[3.45, 102], [7.94, 95]]
-	return quality, tour, trace
+
+	# change index numbers to start from 0
+	for id in nodes:
+		id[0] = int(id[0]-1)
+
+	# check if seed exist
+	if seed is not None:
+		# Use the seed to get a random initial tour
+		np.random.seed(seed)
+		rand_tour = np.random.permutation(np.arange(len(nodes)))
+
+		# Evaluate distance of this random initial tour
+		rand_quality = evaluation_function(rand_tour, nodes)
+
+	# calculate distances between each node
+	distances_dict = defaultdict(dict)
+
+	for i in nodes:
+		i_id = i[0]
+		for j in nodes:
+			j_id = j[0]
+			if j_id not in distances_dict[i_id]:
+				this_distance = distance(i[1], i[2], j[1], j[2])
+				distances_dict[i_id][j_id] = this_distance
+				distances_dict[j_id][i_id] = this_distance
+
+	# start algorithm
+	trace = []
+
+	if seed is not None:
+		trace.append([round(timer(), 2), rand_quality])
+
+	city = randrange(1, len(nodes))     # pick random city
+	tour, tours = [city], []
+
+	neighbor, length = get_neighbor(distances_dict, tour, city)     # get nearest neighbor
+	tour.append(neighbor)
+	quality = length
+
+	while len(tour) != len(nodes) and timer() <= int(time):
+		select, d = None, float('inf')
+		# selection - find a node k that is not in partial tour
+		# closest to any node j in partial tour that minimizes d(k,j)
+		for k in nodes:
+			k_id = int(k[0])
+			if k_id in tour:
+				continue
+			neighbor, length = get_neighbor(distances_dict, tour, k_id)
+			if length < d:
+				select, d = k_id, length
+		# insertion - find the edge {i,j}
+		# that minimizes d(i,k) + d(k,j) - d(i,j) and insert k
+		insert_id, d = None, float('inf')
+		tour = tour + [tour[0]]
+
+		for i in range(len(tour) - 1):
+			insert = distances_dict[tour[i]][select] + \
+					 distances_dict[select][tour[i + 1]] - \
+					 distances_dict[tour[i]][tour[i + 1]]
+			if insert < d:
+				insert_id, d = i, insert
+
+		quality += distances_dict[tour[insert_id]][select] + \
+				   distances_dict[select][tour[insert_id + 1]] - \
+				   distances_dict[tour[insert_id]][tour[insert_id + 1]]
+
+		tours.append(tour)
+		tour.insert(insert_id + 1, select)
+		tour = tour[:-1]
+
+		if seed is not None:
+			trace.append([round(timer(), 2), rand_quality - quality])
+
+	quality += distances_dict[tour[0]][tour[-1]]
+	trace.append([round(timer(), 2), quality])
+
+	return quality, ','.join(map(str, tour)), trace
+
 
 def LS1(nodes, time, seed):
 	'''
@@ -123,6 +211,7 @@ def LS1(nodes, time, seed):
 	print("End time: ", timer())
 
 	return bestQuality, bestTour, trace
+
 
 def LS2(nodes, time, seed):
 	'''
