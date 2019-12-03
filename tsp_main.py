@@ -126,8 +126,8 @@ def Approx(nodes, time=600, seed=0):
 	quality += distances_dict[tour[0]][tour[-1]]
 	trace.append([round(timer(), 2), quality])
 
-	return quality, ','.join(map(str, tour)), trace
-
+	# return quality, ','.join(map(str, tour)), trace
+	return quality, tour, trace
 
 def LS1(nodes, time=600, seed=0):
 	'''
@@ -168,9 +168,6 @@ def LS1(nodes, time=600, seed=0):
 	bestTour = currentTour
 	bestQuality = currentQuality
 
-	# np.random.seed()	# Reset seed, otherwise you'll get exact same final answer every time. Or that what we want???
-
-	# Consider a different stopping condition - iteration not based on temp, bounded by time
 	while (temperature > 0.99):
 		# Stop if time has exceeded limit
 		end = timer()
@@ -178,15 +175,15 @@ def LS1(nodes, time=600, seed=0):
 			print("TIME LIMIT")
 			break
 
-		# Create new tour. 2-opt exchange. Do you just randomly get four points? Is that considered adjacent?
+		# Create new tour using 2-opt exchange.
 		randPoints = np.random.choice(np.arange(len(currentTour)), size=4, replace=False)
 		newTour = currentTour.copy()
 		save2 = newTour[randPoints[1]]
 		newTour[randPoints[1]] = newTour[randPoints[0]]
 		newTour[randPoints[0]] = save2
-		save4 = newTour[randPoints[3]]
-		newTour[randPoints[3]] = newTour[randPoints[2]]
-		newTour[randPoints[2]] = save4
+		# save4 = newTour[randPoints[3]]
+		# newTour[randPoints[3]] = newTour[randPoints[2]]
+		# newTour[randPoints[2]] = save4
 		newQuality = evaluation_function(newTour, nodes)
 
 		# Calculate probability based on temperature
@@ -201,7 +198,7 @@ def LS1(nodes, time=600, seed=0):
 			currentTour = newTour
 			currentQuality = newQuality
 			end = timer()
-			trace.append([end, currentQuality])
+			trace.append([round(end, 2), currentQuality])
 
 		# Update best solution
 		if currentQuality < bestQuality:
@@ -211,6 +208,8 @@ def LS1(nodes, time=600, seed=0):
 	# print("finalTour: ", bestTour)
 	print("finalQuality: ", bestQuality)
 	print("End time: ", timer())
+
+	bestTour = list(bestTour)
 
 	return bestQuality, bestTour, trace
 
@@ -235,18 +234,45 @@ def LS2(nodes, time=600, seed=0):
 	np.random.seed(seed)
 
 	# Parameters
-	populationSize = 100					# How many different routes at one time, always maintain this size
-	mutationRate = 0.1						# How often to mutate
-	numElites = 30							# Get the top k from each generation and directly let them into the next generation
-	numGenerations = 500					# Basically the number of iterations
+	# populationSize = 100					# How many different routes at one time, always maintain this size
+	# mutationRate = 0.05						# How often to mutate
+	# numElites = 30							# Get the top k from each generation and directly let them into the next generation
+	# numGenerations = 500					# Basically the number of iterations
 
-	# CHANGE INITIAL PARAMETERS BASED ON SIZE OF INPUT?
-	if len(nodes) > 50 and True:
-		print("CHANGE PARAMETERS")
-		populationSize = 100
-		mutationRate = 0.1
-		numElites = 30
-		numGenerations = 500
+	# # CHANGE INITIAL PARAMETERS BASED ON SIZE OF INPUT?
+	# if len(nodes) > 50:
+	# 	print("50 NODES")
+	# 	populationSize = 150
+	# 	mutationRate = 0.05
+	# 	numElites = 75
+	# 	numGenerations = 1000
+	# if len(nodes) > 75:
+	# 	print("75 NODES")
+	# 	populationSize = 200
+	# 	mutationRate = 0.05
+	# 	numElites = 75
+	# 	numGenerations = 1000
+	# if len(nodes) > 100:
+	# 	print("100 NODES")
+	# 	populationSize = 150
+	# 	mutationRate = 0.01
+	# 	numElites = 50
+	# 	numGenerations = 1000
+
+	# Parameters as functions of input size
+	populationSize = len(nodes) * 3
+	mutationRate = 0.05
+	numElites = int(populationSize/3)
+	numGenerations = 1000
+
+	if len(nodes) > 50:
+		print("OVER 50")
+		populationSize = int(len(nodes) * 2)
+		mutationRate = 0.01
+		numElites = int(populationSize/2)
+		numGenerations = 1000
+
+	print(populationSize, mutationRate, numElites, numGenerations)
 
 	# Generate a certain number of initial random tours
 	# Population contains INDICES of nodes
@@ -331,13 +357,13 @@ def LS2(nodes, time=600, seed=0):
 			bestQuality = minQuality
 			bestTour = minTour
 			end = timer()
-			trace.append([end, bestQuality])
+			trace.append([round(end, 2), bestQuality])
 			lastTime = timer()
 
 		# Stopping criterion: No improvement for ?? seconds
 		now = timer()
 		if now-lastTime > 3:
-			print("STOP")
+			print("CONVERGE")
 			break
 
 	# END LOOP
@@ -435,17 +461,9 @@ if __name__ == '__main__':
 	time = float(time)
 	seed = int(seed)
 
-	# print("Arguments: ", filename, alg, time, seed)
-	# print("Argument types: ", type(filename), type(alg), type(time), type(seed))
-
-	# This is sort of hardcoded right now, change it later to use argparse
-	# For now, assume input is of format: python tsp_main.py <FILEPATH> <ALG> <TIME> <SEED>
-	# Example: python tsp_main.py Atlanta.tsp BnB 120 0
+	# Open file and read in nodes
 	nodes = []
-	# args = sys.argv
-	filepath = 'DATA/'
-	# filename = args[1]
-	filepath = filepath + filename
+	filepath = 'DATA/' + filename
 	f = open(filepath, 'r')
 	lines = f.readlines()
 
@@ -455,13 +473,6 @@ if __name__ == '__main__':
 			node = [float(splitStr[0]), float(splitStr[1]), float(splitStr[2])]
 			nodes.append(node)				# Can speed up by pre-allocating & indexing instead of append
 	f.close()
-
-	# alg = args[2]
-	# time = float(args[3])
-
-	# seed = None
-	# if len(args) == 5:
-		# seed = int(args[4])
 
 	# Provide invalid input checking??? e.g. alg = approx w/o seed, BnB with seed, etc
 	# Can we assume valid input always?
@@ -502,5 +513,4 @@ if __name__ == '__main__':
 		temp = str(item)[1:-1] + "\n"
 		temp = temp.replace(" ", "")
 		f.write(temp)
-		# f.write(str(item)[1:-1] + "\n")
 	f.close()
