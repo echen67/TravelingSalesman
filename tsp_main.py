@@ -68,11 +68,11 @@ def LS1(nodes, time, seed):
 	print("nodes: ", len(nodes))
 	np.random.seed(seed)
 	currentTour = np.random.permutation(np.arange(len(nodes)))		# contains INDEX of nodes
-	print("currentTour: ", currentTour)
+	# print("firstTour: ", currentTour)
 
 	# Evaluate distance of this random initial tour
 	currentQuality = evaluation_function(currentTour, nodes)
-	print("currentQuality: ", currentQuality)
+	print("firstQuality: ", currentQuality)
 
 	# Keep track of best solution
 	bestTour = currentTour
@@ -84,7 +84,7 @@ def LS1(nodes, time, seed):
 	while (temperature > 0.99):
 		# Stop if time has exceeded limit
 		end = timer()
-		if end >= time:
+		if end-start >= time:
 			print("TIME LIMIT")
 			break
 
@@ -118,8 +118,9 @@ def LS1(nodes, time, seed):
 			bestTour = currentTour
 			bestQuality = currentQuality
 
-	print("finalTour: ", bestTour)
+	# print("finalTour: ", bestTour)
 	print("finalQuality: ", bestQuality)
+	print("End time: ", timer())
 
 	return bestQuality, bestTour, trace
 
@@ -145,8 +146,8 @@ def LS2(nodes, time, seed):
 	# Parameters
 	populationSize = 100					# How many different routes at one time, always maintain this size
 	mutationRate = 0.1						# How often to mutate
-	numElites = 10							# Get the top k from each generation and directly let them into the next generation
-	numGenerations = 200					# Basically the number of iterations
+	numElites = 30							# Get the top k from each generation and directly let them into the next generation
+	numGenerations = 500					# Basically the number of iterations
 
 	# Generate a certain number of initial random tours
 	# Population contains INDICES of nodes
@@ -154,19 +155,22 @@ def LS2(nodes, time, seed):
 	for i in range(populationSize):
 		tour = np.random.permutation(np.arange(len(nodes)))
 		population.append(tour)
-	print("population: ", len(population))
+	# print("population: ", len(population))
 
 	bestQuality = evaluation_function(population[i], nodes)
 	bestTour = population[0]
 
 	print("firstQuality: ", bestQuality)
-	print("firstTour: ", bestTour)
+	# print("firstTour: ", bestTour)
+
+	# Stopping criterion - no improvement for ??? seconds
+	lastTime = timer()
 
 	# START LOOP
 	for i in range(numGenerations):
 		# Stop if time has exceeded limit
 		end = timer()
-		if end >= time:
+		if end-start >= time:
 			print("TIME LIMIT")
 			break
 
@@ -223,16 +227,25 @@ def LS2(nodes, time, seed):
 		minQuality = distances[minInd]
 		minTour = population[minInd]
 
+		# Update best solution
 		if minQuality < bestQuality:
 			bestQuality = minQuality
 			bestTour = minTour
 			end = timer()
 			trace.append([end, bestQuality])
+			lastTime = timer()
+
+		# Stopping criterion: No improvement for ?? seconds
+		now = timer()
+		if now-lastTime > 3:
+			print("STOP")
+			break
 
 	# END LOOP
 
-	print("bestQuality: ", bestQuality)
-	print("bestTour: ", bestTour)
+	print("finalQuality: ", bestQuality)
+	# print("finalTour: ", bestTour)
+	print("End time: ", timer())
 
 	return bestQuality, bestTour, trace
 
@@ -310,7 +323,7 @@ if __name__ == '__main__':
 	# This is sort of hardcoded right now, change it later to use argparse
 	# Confused about their arguments
 	# For now, assume input is of format: python tsp_main.py <FILEPATH> <ALG> <TIME> <SEED>
-	# Example: tsp_main.py Atlanta.tsp BnB 120 0
+	# Example: python tsp_main.py Atlanta.tsp BnB 120 0
 	nodes = []
 	args = sys.argv
 	filepath = 'DATA/'
@@ -328,7 +341,8 @@ if __name__ == '__main__':
 	f.close()
 
 	alg = args[2]
-	time = args[3]
+	time = float(args[3])
+	# print("TIME", type(time))
 
 	seed = None
 	if len(args) == 5:
@@ -349,7 +363,7 @@ if __name__ == '__main__':
 
 	# Output Files
 	# Solution file
-	outputName = filename[:-4] + "_" + alg + "_" + time
+	outputName = filename[:-4] + "_" + alg + "_" + str(time)
 	if seed != None:
 		outputName = outputName + "_" + str(seed)
 	outputName = outputName + ".sol"
@@ -360,7 +374,7 @@ if __name__ == '__main__':
 	f.close()
 
 	# Trace file
-	traceName = filename[:-4] + "_" + alg + "_" + time
+	traceName = filename[:-4] + "_" + alg + "_" + str(time)
 	if seed != None:
 		traceName = traceName + "_" + str(seed)
 	traceName = traceName + ".trace"
