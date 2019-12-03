@@ -10,10 +10,10 @@ BnBbestQuality = float('inf')
 BnBbestTour = []
 BnBtrace = []
 visited = []
-
+distanceList = []
 
 # Branch and Bound algorithm
-def BnB(nodes, time):
+def BnB(nodes, time, seed):
     '''
     Args:
     -    nodes: N x 3 array of nodes
@@ -25,45 +25,54 @@ def BnB(nodes, time):
     -    trace: list of best found solution at that point in time. Record every time a new improved solution is found.
     '''
     global BnBbestTour
+    global  BnBbestQuality
+    global  BnBtrace
     global visited
+    global distanceList
 
     start = timer()
-    BnBbestTour = [None] * (len(nodes) + 1)
-    visited = [None] * (len(nodes))
+    # BnBbestTour = [None] * len(nodes)
+    BnBbestQuality, BnBbestTour, BnBtrace = Approx(nodes, time, seed)
+    visited = [False] * len(nodes)
+    tempPath = [-1] * len(nodes)
 
-    for i in range(len(BnBbestTour)):
-        BnBbestTour[i] = -1
-    for y in range(len(visited)):
-        visited[y] = False
+    distanceList = [None] * len(nodes)
+
+    for j in range(len(nodes)):
+        distanceList[j] = [minimum(nodes[j], nodes), second_minimum(nodes[j], nodes)]
 
     lb = 0
-    for x in nodes:
-        lb += (minimum(x, nodes) + second_minimum(x, nodes)) / 2
+    for k in range(len(nodes)):
+        lb += (distanceList[k][0] + distanceList[k][1]) / 2
 
     # Initialize the start point
     randNum = random.randint(0, len(nodes))
     visited[randNum-1] = True
-    BnBbestTour[0] = randNum-1
+    tempPath[0] = randNum-1
 
-    BnBHelp(nodes, start, 1, lb, 0, float(time))
+    BnBHelp(nodes, start, 1, lb, 0, tempPath, float(time))
     return BnBbestQuality, BnBbestTour, BnBtrace
 
 
-def BnBHelp(nodes, time, level, lb, weight, timeLimit):
+def BnBHelp(nodes, time, level, lb, weight, tempPath, timeLimit):
     global BnBbestQuality
     global BnBbestTour
     global BnBtrace
     global visited
+    global distanceList
 
     # Finalize values after all nodes are traversed
     if level == len(nodes):
-        newQuality = weight + distance(nodes[BnBbestTour[level - 1]][1], nodes[BnBbestTour[level - 1]][2],
-                                       nodes[BnBbestTour[0]][1], nodes[BnBbestTour[0]][2])
-        print(newQuality)
-        print(BnBtrace)
-        print(BnBbestTour, '\n')
+        newQuality = weight + distance(nodes[tempPath[level - 1]][1], nodes[tempPath[level - 1]][2],
+                                       nodes[tempPath[0]][1], nodes[tempPath[0]][2])
+
         if newQuality < BnBbestQuality:
-            BnBbestTour[len(nodes)] = BnBbestTour[0]
+
+            # for i in range(len(nodes)):
+            #     BnBbestTour[i] = tempPath[i]
+            # BnBbestTour[len(nodes)] = tempPath[0]
+
+            BnBbestTour = tempPath
             BnBbestQuality = newQuality
             BnBtrace.append([timer() - time, BnBbestQuality])
 
@@ -74,53 +83,52 @@ def BnBHelp(nodes, time, level, lb, weight, timeLimit):
 
     # If there are still nodes not traversed, check whether we should continue iterating further
     for i in range(len(nodes)):
-        # print(level)
-        # print(i)
         if timer() - time > timeLimit:
             print("Time Limit met")
             break
 
         if not visited[i]:
             temp_lb = lb
-            weight += distance(nodes[BnBbestTour[level - 1]][1], nodes[BnBbestTour[level - 1]][2],
+            weight += distance(nodes[tempPath[level - 1]][1], nodes[tempPath[level - 1]][2],
                                nodes[i][1], nodes[i][2])
             if level == 1:
-                lb -= (minimum(nodes[BnBbestTour[level - 1]], nodes) + minimum(nodes[i], nodes)) / 2
+                lb -= (distanceList[tempPath[level - 1]][0] + distanceList[i][0]) / 2
             else:
-                lb -= (second_minimum(nodes[BnBbestTour[level - 1]], nodes) + minimum(nodes[i], nodes)) / 2
+                lb -= (distanceList[tempPath[level - 1]][1] + distanceList[i][0])/2
 
             # Calculate the lower bound for the current node
             if lb + weight < BnBbestQuality:
-                BnBbestTour[level] = int(nodes[i][0])-1
+                tempPath[level] = i
                 visited[i] = True
-                BnBHelp(nodes, time, level + 1, lb, weight, timeLimit)
-            else:
-                weight -= distance(nodes[BnBbestTour[level - 1]][1], nodes[BnBbestTour[level - 1]][2],
-                                   nodes[i][1], nodes[i][2])
-                lb = temp_lb
-                for y in range(len(visited)):
-                    visited[y] = False
-                for j in range(level):
-                    visited[BnBbestTour[j] - 1] = True
+                BnBHelp(nodes, time, level + 1, lb, weight, tempPath, timeLimit)
+
+            weight -= distance(nodes[tempPath[level - 1]][1], nodes[tempPath[level - 1]][2],
+                                nodes[i][1], nodes[i][2])
+            lb = temp_lb
+            visited = [False] * len(nodes)
+            for j in range(level):
+                visited[tempPath[j]] = True
 
 
 def minimum(node, nodes):
     curr_min = float('inf')
-    for x in nodes:
-        curr_dist = distance(x[1], x[2], node[1], node[2])
-        if curr_dist < curr_min and x != node:
+    for i in range(len(nodes)):
+        curr_dist = distance(nodes[i][1], nodes[i][2], node[1], node[2])
+        if curr_dist < curr_min and nodes[i] != node:
             curr_min = curr_dist
     return curr_min
 
 
 def second_minimum(node, nodes):
     first_min, second_min = float('inf'), float('inf')
-    for x in nodes:
-        curr_dist = distance(x[1], x[2], node[1], node[2])
+    for i in range(len(nodes)):
+        if nodes[i] == node:
+            continue
+        curr_dist = distance(nodes[i][1], nodes[i][2], node[1], node[2])
         if curr_dist <= first_min:
             second_min = first_min
             first_min = curr_dist
-        elif curr_dist < second_min:
+        elif curr_dist <= second_min and curr_dist != first_min:
             second_min = curr_dist
     return second_min
 
