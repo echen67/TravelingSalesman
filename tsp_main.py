@@ -1,3 +1,4 @@
+import random
 import sys
 import argparse
 from timeit import default_timer as timer
@@ -8,23 +9,132 @@ from operator import itemgetter
 from random import randrange
 from collections import defaultdict
 
-def BnB(nodes, time):
-	'''
-	Args:
-	-    nodes: N x 3 array of nodes
-	-    time: cut-off time in seconds
+# Global variable
+BnBbestQuality = float('inf')
+BnBbestTour = []
+BnBtrace = []
+visited = []
+distanceList = []
 
-	Returns:
-	-    quality: quality of best solution found
-	-    tour: list of node IDs
-	-    trace: list of best found solution at that point in time. Record every time a new improved solution is found.
-	'''
-	# Dummy values
-	quality = 0
-	tour = [1, 2, 3]
-	trace = [[3.45, 102], [7.94, 95]]
-	return quality, tour, trace
+# Branch and Bound algorithm
+def BnB(nodes, time, seed):
+    '''
+    Args:
+    -    nodes: N x 3 array of nodes
+    -    time: cut-off time in seconds
 
+    Returns:
+    -    quality: quality of best solution found
+    -    tour: list of node IDs
+    -    trace: list of best found solution at that point in time. Record every time a new improved solution is found.
+    '''
+    global BnBbestTour
+    global  BnBbestQuality
+    global  BnBtrace
+    global visited
+    global distanceList
+
+    start = timer()
+    # BnBbestTour = [None] * len(nodes)
+    BnBbestQuality, BnBbestTour, BnBtrace = Approx(nodes, time, seed)
+    visited = [False] * len(nodes)
+    tempPath = [-1] * len(nodes)
+
+    distanceList = [None] * len(nodes)
+
+    for j in range(len(nodes)):
+        distanceList[j] = [minimum(nodes[j], nodes), second_minimum(nodes[j], nodes)]
+
+    lb = 0
+    for k in range(len(nodes)):
+        lb += (distanceList[k][0] + distanceList[k][1]) / 2
+
+    # Initialize the start point
+    randNum = random.randint(0, len(nodes))
+    visited[randNum-1] = True
+    tempPath[0] = randNum-1
+
+    BnBHelp(nodes, start, 1, lb, 0, tempPath, float(time))
+    return BnBbestQuality, BnBbestTour, BnBtrace
+
+
+def BnBHelp(nodes, time, level, lb, weight, tempPath, timeLimit):
+    global BnBbestQuality
+    global BnBbestTour
+    global BnBtrace
+    global visited
+    global distanceList
+
+    # Finalize values after all nodes are traversed
+    if level == len(nodes):
+        newQuality = weight + distance(nodes[tempPath[level - 1]][1], nodes[tempPath[level - 1]][2],
+                                       nodes[tempPath[0]][1], nodes[tempPath[0]][2])
+
+        if newQuality < BnBbestQuality:
+
+            # for i in range(len(nodes)):
+            #     BnBbestTour[i] = tempPath[i]
+            # BnBbestTour[len(nodes)] = tempPath[0]
+
+            BnBbestTour = tempPath
+            BnBbestQuality = newQuality
+            BnBtrace.append([timer() - time, BnBbestQuality])
+
+            print(newQuality)
+            print(BnBtrace)
+            print(BnBbestTour, '\n')
+            return
+
+    # If there are still nodes not traversed, check whether we should continue iterating further
+    for i in range(len(nodes)):
+        if timer() - time > timeLimit:
+            print("Time Limit met")
+            break
+
+        if not visited[i]:
+            temp_lb = lb
+            weight += distance(nodes[tempPath[level - 1]][1], nodes[tempPath[level - 1]][2],
+                               nodes[i][1], nodes[i][2])
+            if level == 1:
+                lb -= (distanceList[tempPath[level - 1]][0] + distanceList[i][0]) / 2
+            else:
+                lb -= (distanceList[tempPath[level - 1]][1] + distanceList[i][0])/2
+
+            # Calculate the lower bound for the current node
+            if lb + weight < BnBbestQuality:
+                tempPath[level] = i
+                visited[i] = True
+                BnBHelp(nodes, time, level + 1, lb, weight, tempPath, timeLimit)
+
+            weight -= distance(nodes[tempPath[level - 1]][1], nodes[tempPath[level - 1]][2],
+                                nodes[i][1], nodes[i][2])
+            lb = temp_lb
+            visited = [False] * len(nodes)
+            for j in range(level):
+                visited[tempPath[j]] = True
+
+
+def minimum(node, nodes):
+    curr_min = float('inf')
+    for i in range(len(nodes)):
+        curr_dist = distance(nodes[i][1], nodes[i][2], node[1], node[2])
+        if curr_dist < curr_min and nodes[i] != node:
+            curr_min = curr_dist
+    return curr_min
+
+
+def second_minimum(node, nodes):
+    first_min, second_min = float('inf'), float('inf')
+    for i in range(len(nodes)):
+        if nodes[i] == node:
+            continue
+        curr_dist = distance(nodes[i][1], nodes[i][2], node[1], node[2])
+        if curr_dist <= first_min:
+            second_min = first_min
+            first_min = curr_dist
+        elif curr_dist <= second_min and curr_dist != first_min:
+            second_min = curr_dist
+    return second_min
 
 def get_neighbor(distances, tour, node):
 	neighbors = distances[node]
@@ -375,73 +485,77 @@ def LS2(nodes, time=600, seed=0):
 	return bestQuality, bestTour, trace
 
 def crossover(parent1, parent2):
-	'''
-	Breed two tours by taking a random slice of one parent and
-	joining it with the remaining genes of the second parent.
-	'''
-	child1 = []
-	child2 = []
-	gene1 = np.random.choice(np.arange(len(parent1)))
-	gene2 = np.random.choice(np.arange(len(parent1)))
-	startGene = min(gene1, gene2)
-	endGene = max(gene1, gene2)
+    '''
+    Breed two tours by taking a random slice of one parent and
+    joining it with the remaining genes of the second parent.
+    '''
+    child1 = []
+    child2 = []
+    gene1 = np.random.choice(np.arange(len(parent1)))
+    gene2 = np.random.choice(np.arange(len(parent1)))
+    startGene = min(gene1, gene2)
+    endGene = max(gene1, gene2)
 
-	for i in range(startGene, endGene):
-		child1.append(parent1[i])
+    for i in range(startGene, endGene):
+        child1.append(parent1[i])
 
-	child2 = [gene for gene in parent2 if gene not in child1]
+    child2 = [gene for gene in parent2 if gene not in child1]
 
-	return child1 + child2
+    return child1 + child2
+
 
 def mutate(tour):
-	'''
-	Randomly swap two nodes in the tour
-	'''
-	mutatedTour = tour.copy()
-	randIndices = np.random.choice(np.arange(len(mutatedTour)), size=2)
-	save = mutatedTour[randIndices[1]]
-	mutatedTour[randIndices[1]] = mutatedTour[randIndices[0]]
-	mutatedTour[randIndices[0]] = save
-	return mutatedTour
+    '''
+    Randomly swap two nodes in the tour
+    '''
+    mutatedTour = tour.copy()
+    randIndices = np.random.choice(np.arange(len(mutatedTour)), size=2)
+    save = mutatedTour[randIndices[1]]
+    mutatedTour[randIndices[1]] = mutatedTour[randIndices[0]]
+    mutatedTour[randIndices[0]] = save
+    return mutatedTour
+
 
 def evaluation_function(tour, nodes):
-	'''
-	Calculates the total distance of a tour.
+    '''
+    Calculates the total distance of a tour.
 
-	Args:
-	-    tour: N array of node INDICES
+    Args:
+    -    tour: N array of node INDICES
 
-	Returns:
-	-    distance: an int representing the length of the tour
-	'''
+    Returns:
+    -    distance: an int representing the length of the tour
+    '''
 
-	# if len(tour) == 1?
+    # if len(tour) == 1?
 
-	dist = 0
-	currentCity = None
-	nextCity = None
-	for i in range(len(tour)):
-		currentCity = nodes[tour[i]]
-		if i == len(tour) - 1:		# If i points to the last city in the list
-			nextCity = nodes[tour[0]]
-		else:
-			nextCity = nodes[tour[i+1]]
-		dist += distance(currentCity[1], currentCity[2], nextCity[1], nextCity[2])
-	return dist
+    dist = 0
+    currentCity = None
+    nextCity = None
+    for i in range(len(tour)):
+        currentCity = nodes[tour[i]]
+        if i == len(tour) - 1:  # If i points to the last city in the list
+            nextCity = nodes[tour[0]]
+        else:
+            nextCity = nodes[tour[i + 1]]
+        dist += distance(currentCity[1], currentCity[2], nextCity[1], nextCity[2])
+    return dist
+
 
 def distance(x1, y1, x2, y2):
-	'''
-	Returns the distance between two cities given the x and y coordinates of both.
+    '''
+    Returns the distance between two cities given the x and y coordinates of both.
 
-	Args:
-	-    x1, y1: Coordinates of current city
-	-    x2, y2: Coordinates of next city
+    Args:
+    -    x1, y1: Coordinates of current city
+    -    x2, y2: Coordinates of next city
 
-	Returns:
-	-    distance: Distance between the two cities, rounded to the nearest integer
-	'''
+    Returns:
+    -    distance: Distance between the two cities, rounded to the nearest integer
+    '''
 
-	return round(math.sqrt((x2-x1)**2 + (y2-y1)**2))
+    return round(math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2))
+
 
 if __name__ == '__main__':
 
