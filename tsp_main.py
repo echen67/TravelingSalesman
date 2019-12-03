@@ -3,6 +3,7 @@ import argparse
 from timeit import default_timer as timer
 import numpy as np
 import math
+import random
 from operator import itemgetter
 from random import randrange
 from collections import defaultdict
@@ -35,7 +36,7 @@ def get_neighbor(distances, tour, node):
 	return neighbor_info[0][0], neighbor_info[0][1]
 
 
-def Approx(nodes, time, seed):
+def Approx(nodes, time=600, seed=0):
 	'''
 	Closest Insertion
 	Args:
@@ -57,6 +58,7 @@ def Approx(nodes, time, seed):
 	if seed is not None:
 		# Use the seed to get a random initial tour
 		np.random.seed(seed)
+		random.seed(seed)
 		rand_tour = np.random.permutation(np.arange(len(nodes)))
 
 		# Evaluate distance of this random initial tour
@@ -127,7 +129,7 @@ def Approx(nodes, time, seed):
 	return quality, ','.join(map(str, tour)), trace
 
 
-def LS1(nodes, time, seed):
+def LS1(nodes, time=600, seed=0):
 	'''
 	Simulated annealing.
 
@@ -142,7 +144,7 @@ def LS1(nodes, time, seed):
 	-    trace: list of best found solution at that point in time. Record every time a new improved solution is found.
 	'''
 
-	# STILL NEED TO OPTIMIZE - USE TIME LIMIT?
+	# STILL NEED TO OPTIMIZE
 	# Better stopping criterion - no improved solution for a certain number of iterations
 	# Restarts?
 	# ADD TABU???
@@ -213,7 +215,7 @@ def LS1(nodes, time, seed):
 	return bestQuality, bestTour, trace
 
 
-def LS2(nodes, time, seed):
+def LS2(nodes, time=600, seed=0):
 	'''
 	Genetic algorithm.
 	
@@ -237,6 +239,14 @@ def LS2(nodes, time, seed):
 	mutationRate = 0.1						# How often to mutate
 	numElites = 30							# Get the top k from each generation and directly let them into the next generation
 	numGenerations = 500					# Basically the number of iterations
+
+	# CHANGE INITIAL PARAMETERS BASED ON SIZE OF INPUT?
+	if len(nodes) > 50 and True:
+		print("CHANGE PARAMETERS")
+		populationSize = 100
+		mutationRate = 0.1
+		numElites = 30
+		numGenerations = 500
 
 	# Generate a certain number of initial random tours
 	# Population contains INDICES of nodes
@@ -409,33 +419,49 @@ def distance(x1, y1, x2, y2):
 
 if __name__ == '__main__':
 
+	# ARGPARSE
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-inst')
+	parser.add_argument('-alg')
+	parser.add_argument('-time')
+	parser.add_argument('-seed')
+	parsed_args = parser.parse_args()
+
+	filename = parsed_args.inst
+	alg = parsed_args.alg
+	time = parsed_args.time
+	seed = parsed_args.seed
+
+	time = float(time)
+	seed = int(seed)
+
+	# print("Arguments: ", filename, alg, time, seed)
+	# print("Argument types: ", type(filename), type(alg), type(time), type(seed))
+
 	# This is sort of hardcoded right now, change it later to use argparse
-	# Confused about their arguments
 	# For now, assume input is of format: python tsp_main.py <FILEPATH> <ALG> <TIME> <SEED>
 	# Example: python tsp_main.py Atlanta.tsp BnB 120 0
 	nodes = []
-	args = sys.argv
+	# args = sys.argv
 	filepath = 'DATA/'
-	filename = args[1]
+	# filename = args[1]
 	filepath = filepath + filename
 	f = open(filepath, 'r')
 	lines = f.readlines()
 
 	for line in lines:
 		splitStr = line.split()
-		# print(len(splitStr))
 		if len(splitStr) != 0 and splitStr[0].isdigit():
 			node = [float(splitStr[0]), float(splitStr[1]), float(splitStr[2])]
 			nodes.append(node)				# Can speed up by pre-allocating & indexing instead of append
 	f.close()
 
-	alg = args[2]
-	time = float(args[3])
-	# print("TIME", type(time))
+	# alg = args[2]
+	# time = float(args[3])
 
-	seed = None
-	if len(args) == 5:
-		seed = int(args[4])
+	# seed = None
+	# if len(args) == 5:
+		# seed = int(args[4])
 
 	# Provide invalid input checking??? e.g. alg = approx w/o seed, BnB with seed, etc
 	# Can we assume valid input always?
@@ -459,7 +485,10 @@ if __name__ == '__main__':
 
 	f = open(outputName, "w")
 	f.write(str(quality) + "\n")
-	f.write(str(tour))
+	temp = str(tour)
+	temp = temp[1:-1]
+	temp = temp.replace(" ", "")
+	f.write(temp)
 	f.close()
 
 	# Trace file
@@ -470,5 +499,8 @@ if __name__ == '__main__':
 
 	f = open(traceName, "w")
 	for item in trace:
-		f.write(str(item)[1:-1] + "\n")
+		temp = str(item)[1:-1] + "\n"
+		temp = temp.replace(" ", "")
+		f.write(temp)
+		# f.write(str(item)[1:-1] + "\n")
 	f.close()
