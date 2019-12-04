@@ -9,7 +9,7 @@ from operator import itemgetter
 from random import randrange
 from collections import defaultdict
 
-# Global variable
+# Global variable for BnB algorithm
 BnBbestQuality = float('inf')
 BnBbestTour = []
 BnBtrace = []
@@ -22,38 +22,39 @@ def BnB(nodes, time):
     Args:
     -    nodes: N x 3 array of nodes
     -    time: cut-off time in seconds
-
     Returns:
     -    quality: quality of best solution found
     -    tour: list of node IDs
     -    trace: list of best found solution at that point in time. Record every time a new improved solution is found.
     '''
     global BnBbestTour
-    global  BnBbestQuality
-    global  BnBtrace
+    global BnBbestQuality
+    global BnBtrace
     global visited
     global distanceList
 
     start = timer()
-    # BnBbestTour = [None] * len(nodes)
-    BnBbestQuality, BnBbestTour, BnBtrace = Approx(nodes, time, 0)
+
+    # Initialize the visited List and the current path list
     visited = [False] * len(nodes)
     tempPath = [-1] * len(nodes)
 
+    # Calculate the first and second minimum distance from one node to any other node
     distanceList = [None] * len(nodes)
-
     for j in range(len(nodes)):
         distanceList[j] = [minimum(nodes[j], nodes), second_minimum(nodes[j], nodes)]
 
+    # Initialize the lower bound for the algorithm
     lb = 0
     for k in range(len(nodes)):
         lb += (distanceList[k][0] + distanceList[k][1]) / 2
 
-    # Initialize the start point
+    # Initialize the random start point
     randNum = random.randint(0, len(nodes))
-    visited[randNum-1] = True
-    tempPath[0] = randNum-1
+    visited[randNum - 1] = True
+    tempPath[0] = randNum - 1
 
+    # Start recursion from level 1 and weight 0
     BnBHelp(nodes, start, 1, lb, 0, tempPath, float(time))
     return BnBbestQuality, BnBbestTour, BnBtrace
 
@@ -71,18 +72,13 @@ def BnBHelp(nodes, time, level, lb, weight, tempPath, timeLimit):
                                        nodes[tempPath[0]][1], nodes[tempPath[0]][2])
 
         if newQuality < BnBbestQuality:
-
-            # for i in range(len(nodes)):
-            #     BnBbestTour[i] = tempPath[i]
-            # BnBbestTour[len(nodes)] = tempPath[0]
-
             BnBbestTour = tempPath
             BnBbestQuality = newQuality
-            BnBtrace.append([timer() - time, BnBbestQuality])
+            BnBtrace.append(["%.2f" % round(timer(), 2), BnBbestQuality])
 
             print(newQuality)
-            print(BnBtrace)
-            print(BnBbestTour, '\n')
+            # print(BnBtrace)
+            # print(BnBbestTour, '\n')
             return
 
     # If there are still nodes not traversed, check whether we should continue iterating further
@@ -98,7 +94,7 @@ def BnBHelp(nodes, time, level, lb, weight, tempPath, timeLimit):
             if level == 1:
                 lb -= (distanceList[tempPath[level - 1]][0] + distanceList[i][0]) / 2
             else:
-                lb -= (distanceList[tempPath[level - 1]][1] + distanceList[i][0])/2
+                lb -= (distanceList[tempPath[level - 1]][1] + distanceList[i][0]) / 2
 
             # Calculate the lower bound for the current node
             if lb + weight < BnBbestQuality:
@@ -106,14 +102,16 @@ def BnBHelp(nodes, time, level, lb, weight, tempPath, timeLimit):
                 visited[i] = True
                 BnBHelp(nodes, time, level + 1, lb, weight, tempPath, timeLimit)
 
+            # Change the weight and lower bound back to the level that has lb+weight < best quality
             weight -= distance(nodes[tempPath[level - 1]][1], nodes[tempPath[level - 1]][2],
-                                nodes[i][1], nodes[i][2])
+                               nodes[i][1], nodes[i][2])
             lb = temp_lb
             visited = [False] * len(nodes)
             for j in range(level):
                 visited[tempPath[j]] = True
 
 
+# Find the minimum distance from one node to any other node
 def minimum(node, nodes):
     curr_min = float('inf')
     for i in range(len(nodes)):
@@ -123,6 +121,7 @@ def minimum(node, nodes):
     return curr_min
 
 
+# Find the second minimum distance from one node to any other node
 def second_minimum(node, nodes):
     first_min, second_min = float('inf'), float('inf')
     for i in range(len(nodes)):
