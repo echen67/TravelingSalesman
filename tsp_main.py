@@ -381,6 +381,12 @@ def LS2(nodes, time=600, seed=0):
 		mutationRate = 0.01
 		numElites = int(populationSize/2)
 		numGenerations = 1000
+	if len(nodes) > 100:
+		print("OVER 100")
+		populationSize = int(len(nodes) * 3)
+		mutationRate = 0.01
+		numElites = int(populationSize/2)
+		numGenerations = 1000
 
 	print(populationSize, mutationRate, numElites, numGenerations)
 
@@ -454,22 +460,22 @@ def LS2(nodes, time=600, seed=0):
 		population = mutatedPopulation
 
 		# Find best tour of this generation
-		distances = []
-		for tour in population:
-			quality = evaluation_function(tour, nodes)
-			distances.append(quality)
-		minInd = np.argmin(distances)
-		minQuality = distances[minInd]
-		minTour = population[minInd]
+		# distances = []
+		# for tour in population:
+		# 	quality = evaluation_function(tour, nodes)
+		# 	distances.append(quality)
+		# minInd = np.argmin(distances)
+		# minQuality = distances[minInd]
+		# minTour = population[minInd]
 
 		# faster
-		# minTour = None
-		# minQuality = float('inf')
-		# for tour in population:
-		# 	d = evaluation_function(tour, nodes)
-		# 	if d < minQuality:
-		# 		minQuality = d
-		# 		minTour = tour
+		minTour = None
+		minQuality = float('inf')
+		for tour in population:
+			d = evaluation_function(tour, nodes)
+			if d < minQuality:
+				minQuality = d
+				minTour = tour
 
 		# Update best solution
 		if minQuality < bestQuality:
